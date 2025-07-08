@@ -1,3 +1,5 @@
+import 'message_model.dart';
+
 class ConversationModel {
   final String id;
   final String participant1Id;
@@ -11,6 +13,7 @@ class ConversationModel {
   final String status; // 'active', 'ended', etc.
   final DateTime? lastMessageAt;
   final String? lastMessageContent;
+  final List<MessageModel>? messages; // Messages in the conversation
 
   ConversationModel({
     required this.id,
@@ -25,26 +28,46 @@ class ConversationModel {
     required this.status,
     this.lastMessageAt,
     this.lastMessageContent,
+    this.messages,
   });
 
   factory ConversationModel.fromJson(Map<String, dynamic> json) {
+    List<MessageModel>? messages;
+    if (json['messages'] != null) {
+      messages = (json['messages'] as List)
+          .map((messageJson) => MessageModel.fromJson(messageJson))
+          .toList();
+    }
+
+    // Handle date parsing with null safety
+    DateTime parseDate(dynamic dateValue) {
+      if (dateValue == null) {
+        return DateTime.now(); // Fallback to current time
+      }
+      if (dateValue is String) {
+        try {
+          return DateTime.parse(dateValue);
+        } catch (e) {
+          return DateTime.now(); // Fallback to current time
+        }
+      }
+      return DateTime.now(); // Fallback to current time
+    }
+
     return ConversationModel(
-      id: json['id'] ?? '',
-      participant1Id: json['participant1_id'] ?? '',
-      participant2Id: json['participant2_id'] ?? '',
-      participant1Name: json['participant1_name'],
-      participant2Name: json['participant2_name'],
-      participant1Title: json['participant1_title'],
-      participant2Title: json['participant2_title'],
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'])
-          : null,
-      status: json['status'] ?? 'active',
-      lastMessageAt: json['last_message_at'] != null
-          ? DateTime.parse(json['last_message_at'])
-          : null,
-      lastMessageContent: json['last_message_content'],
+      id: json['id']?.toString() ?? '',
+      participant1Id: json['participant1_id']?.toString() ?? '',
+      participant2Id: json['participant2_id']?.toString() ?? '',
+      participant1Name: json['participant1_name']?.toString(),
+      participant2Name: json['participant2_name']?.toString(),
+      participant1Title: json['participant1_title']?.toString(),
+      participant2Title: json['participant2_title']?.toString(),
+      createdAt: parseDate(json['created_at']),
+      updatedAt: json['updated_at'] != null ? parseDate(json['updated_at']) : null,
+      status: json['status']?.toString() ?? 'active',
+      lastMessageAt: json['last_message_at'] != null ? parseDate(json['last_message_at']) : null,
+      lastMessageContent: json['last_message_content']?.toString(),
+      messages: messages,
     );
   }
 
@@ -62,6 +85,7 @@ class ConversationModel {
       'status': status,
       'last_message_at': lastMessageAt?.toIso8601String(),
       'last_message_content': lastMessageContent,
+      'messages': messages?.map((message) => message.toJson()).toList(),
     };
   }
 

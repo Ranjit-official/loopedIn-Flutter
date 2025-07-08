@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:loopedin/features/auth/resources/api_service.dart';
 import 'package:loopedin/features/auth/resources/user_service.dart';
 import 'package:loopedin/common/models/conversation_model.dart';
+import 'package:loopedin/features/chat/ui/pages/chat_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -643,9 +643,27 @@ class _HomePageState extends State<HomePage>
                   lastActive: conversation.getLastActiveText(),
                   onTap: () {
                     // Navigate to chat page with conversation
-                    // Navigator.push(context, MaterialPageRoute(
-                    //   builder: (context) => ChatPage(conversationId: conversation.id),
-                    // ));
+                    if (kDebugMode) {
+                      print('Tapping conversation with ID: ${conversation.id}');
+                      print('Conversation data: ${conversation.toJson()}');
+                    }
+
+                    if (conversation.id.isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              ChatPage(conversationId: conversation.id),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Invalid conversation ID'),
+                          backgroundColor: Color(0xFFEF4444),
+                        ),
+                      );
+                    }
                   },
                 );
               }).toList(),

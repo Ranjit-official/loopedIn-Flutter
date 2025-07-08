@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:loopedin/common/models/user_model.dart';
 import 'package:loopedin/common/models/conversation_model.dart';
+import 'package:loopedin/common/models/message_model.dart';
 
 // API response models
 class ApiUser {
@@ -418,12 +418,52 @@ class ApiService {
   // Get conversation by ID
   Future<ConversationModel> getConversationById(String conversationId) async {
     try {
+      if (kDebugMode) {
+        print('Fetching conversation with ID: $conversationId');
+      }
+
       final response = await _dio.get(
         '$_conversationsEndpoint/$conversationId',
       );
 
+      if (kDebugMode) {
+        print('API Response status: ${response.statusCode}');
+        print('API Response data: ${response.data}');
+        print('API Response data type: ${response.data.runtimeType}');
+      }
+
       if (response.statusCode == 200) {
-        return ConversationModel.fromJson(response.data);
+        try {
+          // For debugging, let's also handle the case where the response might be wrapped
+          Map<String, dynamic> conversationData;
+          if (response.data is Map<String, dynamic>) {
+            conversationData = response.data;
+          } else if (response.data is List && response.data.isNotEmpty) {
+            // If it's a list, take the first item
+            conversationData = response.data[0];
+          } else {
+            throw Exception(
+              'Unexpected response format: ${response.data.runtimeType}',
+            );
+          }
+
+          if (kDebugMode) {
+            print('Parsing conversation data: $conversationData');
+          }
+
+          return ConversationModel.fromJson(conversationData);
+        } catch (parseError) {
+          if (kDebugMode) {
+            print('Error parsing conversation data: $parseError');
+            print('Raw data: ${response.data}');
+            print('Raw data type: ${response.data.runtimeType}');
+          }
+          throw DioException(
+            requestOptions: response.requestOptions,
+            response: response,
+            message: 'Failed to parse conversation data: $parseError',
+          );
+        }
       } else {
         throw DioException(
           requestOptions: response.requestOptions,
@@ -590,6 +630,78 @@ class ApiService {
     } catch (e) {
       if (kDebugMode) {
         print('Delete conversation error: $e');
+      }
+      rethrow;
+    }
+  }
+
+  // Send message
+  Future<MessageModel> sendMessage({
+    required String conversationId,
+    required String content,
+    String messageType = 'text',
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/chat/messages',
+        data: {
+          'conversation_id': conversationId,
+          'content': content,
+          'message_type': messageType,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return MessageModel.fromJson(response.data);
+      } else {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          message: 'Failed to send message',
+        );
+      }
+    } on DioException catch (e) {
+      if (kDebugMode) {
+        print('Send message API error: ${e.message}');
+        print('Response data: ${e.response?.data}');
+      }
+
+      // Handle specific error cases
+      if (e.response?.statusCode == 401) {
+        throw DioException(
+          requestOptions: e.requestOptions,
+          response: e.response,
+          message: 'Unauthorized. Please sign in again.',
+        );
+      } else if (e.response?.statusCode == 404) {
+        throw DioException(
+          requestOptions: e.requestOptions,
+          response: e.response,
+          message: 'Conversation not found.',
+        );
+      } else if (e.response?.statusCode == 422) {
+        final data = e.response?.data;
+        if (data is Map<String, dynamic>) {
+          final errors = data['errors'] ?? data['message'];
+          if (errors != null) {
+            throw DioException(
+              requestOptions: e.requestOptions,
+              response: e.response,
+              message: errors.toString(),
+            );
+          }
+        }
+        throw DioException(
+          requestOptions: e.requestOptions,
+          response: e.response,
+          message: 'Invalid message data.',
+        );
+      }
+
+      rethrow;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Send message error: $e');
       }
       rethrow;
     }
