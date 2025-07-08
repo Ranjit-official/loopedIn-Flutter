@@ -376,15 +376,14 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildOnlineUsersTab() {
-    return SingleChildScrollView(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          minHeight: MediaQuery.of(context).size.height * 0.7,
-        ),
-        child: IntrinsicHeight(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              const SizedBox(height: 20),
               Stack(
                 alignment: Alignment.topRight,
                 children: [
@@ -430,14 +429,15 @@ class _HomePageState extends State<HomePage>
                   color: Color(0xFF222222),
                   fontFamily: 'Roboto',
                 ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 32),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
                   "If you've found value in LoopIn, we'd be grateful if you considered sharing it with your network. As more professionals join, the platform becomes even more valuable for everyone.",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 14,
                     color: Color(0xFF6B7280),
                     height: 1.4,
@@ -447,28 +447,57 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
               const SizedBox(height: 32),
-              Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                children: [
-                  _buildShareButton('assets/icons/linkedin.png', 'LinkedIn'),
-                  _buildShareButton('assets/icons/facebook.png', 'Facebook'),
-                  _buildShareButton('assets/icons/github.png', 'X'),
-                  _buildShareButton(null, 'Copy URL'),
-                ],
-              ),
-              const SizedBox(height: 16),
+              _buildShareButtons(constraints.maxWidth),
+              const SizedBox(height: 20),
             ],
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildShareButton(String? assetPath, String label) {
+  Widget _buildShareButtons(double maxWidth) {
+    // Calculate responsive button width
+    final buttonWidth = (maxWidth - 48) / 2; // 2 buttons per row with spacing
+    final buttonHeight = 48.0;
+
+    return Wrap(
+      spacing: 16,
+      runSpacing: 16,
+      alignment: WrapAlignment.center,
+      children: [
+        _buildShareButton(
+          'assets/icons/linkedin.png',
+          'LinkedIn',
+          buttonWidth,
+          buttonHeight,
+        ),
+        _buildShareButton(
+          'assets/icons/facebook.png',
+          'Facebook',
+          buttonWidth,
+          buttonHeight,
+        ),
+        _buildShareButton(
+          'assets/icons/github.png',
+          'X',
+          buttonWidth,
+          buttonHeight,
+        ),
+        _buildShareButton(null, 'Copy URL', buttonWidth, buttonHeight),
+      ],
+    );
+  }
+
+  Widget _buildShareButton(
+    String? assetPath,
+    String label,
+    double width,
+    double height,
+  ) {
     return SizedBox(
-      width: 140,
-      height: 48,
+      width: width,
+      height: height,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFF8F9FA),
@@ -494,12 +523,15 @@ class _HomePageState extends State<HomePage>
                 padding: EdgeInsets.only(right: 8),
                 child: Icon(Icons.copy, size: 20, color: Color(0xFF6B7280)),
               ),
-            Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
-                fontFamily: 'Roboto',
+            Flexible(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                  fontFamily: 'Roboto',
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
