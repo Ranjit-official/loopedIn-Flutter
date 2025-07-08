@@ -199,10 +199,16 @@ class _HomePageState extends State<HomePage>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF8F9FA),
+        elevation: 0,
+        toolbarHeight: 80,
+        title: _buildHeader(),
+        automaticallyImplyLeading: false,
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
             _buildStatusBar(),
             _buildTabBar(),
             Expanded(
@@ -221,83 +227,69 @@ class _HomePageState extends State<HomePage>
   }
 
   Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.only(left: 20, right: 20, top: 18, bottom: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Image.asset(
-                'assets/rest/loopin_circle.png',
-                width: 32,
-                height: 32,
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'LoopIn',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF2563EB),
-                  letterSpacing: 0.1,
-                  fontFamily: 'Roboto',
-                ),
-              ),
-            ],
-          ),
-          PopupMenuButton<String>(
-            offset: const Offset(0, 40),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Color(0xFFE5E7EB), width: 2),
-              ),
-              child: ClipOval(
-                child: Image.asset(
-                  'assets/user/userLogo.png',
-                  fit: BoxFit.cover,
-                ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Image.asset('assets/rest/loopin_circle.png', width: 32, height: 32),
+            const SizedBox(width: 10),
+            const Text(
+              'LoopIn',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF2563EB),
+                letterSpacing: 0.1,
+                fontFamily: 'Roboto',
               ),
             ),
-            itemBuilder: (context) => [
-              PopupMenuItem<String>(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.logout,
-                      size: 20,
-                      color: Color(0xFF6B7280),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Logout',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF222222),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            onSelected: (value) {
-              if (value == 'logout') {
-                _showLogoutDialog();
-              }
-            },
+          ],
+        ),
+        PopupMenuButton<String>(
+          offset: const Offset(0, 40),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
           ),
-        ],
-      ),
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Color(0xFFE5E7EB), width: 2),
+            ),
+            child: ClipOval(
+              child: Image.asset('assets/user/userLogo.png', fit: BoxFit.cover),
+            ),
+          ),
+          itemBuilder: (context) => [
+            PopupMenuItem<String>(
+              value: 'logout',
+              child: Row(
+                children: [
+                  const Icon(Icons.logout, size: 20, color: Color(0xFF6B7280)),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Logout',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF222222),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          onSelected: (value) {
+            if (value == 'logout') {
+              _showLogoutDialog();
+            }
+          },
+        ),
+      ],
     );
   }
 
