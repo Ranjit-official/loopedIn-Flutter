@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:loopedin/features/auth/resources/api_service.dart';
+import 'package:loopedin/features/auth/resources/user_service.dart';
+import 'package:loopedin/common/models/conversation_model.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -11,17 +15,184 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final ApiService _apiService = ApiService();
+  final UserService _userService = UserService();
+  List<ConversationModel> _conversations = [];
+  bool _isLoading = false;
+  String? _error;
+  String? _currentUserId;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _initializeData();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initializeData() async {
+    // Get current user ID and auth token first
+    try {
+      final currentUser = await _userService.getCurrentUser();
+      final authToken = await _userService.getAuthToken();
+
+      setState(() {
+        _currentUserId = currentUser?.id;
+      });
+
+      // Set auth token for API calls
+      if (authToken != null) {
+        _apiService.setAuthToken(authToken);
+      }
+    } catch (e) {
+      // Handle error getting current user
+      if (kDebugMode) {
+        print('Error getting current user: $e');
+      }
+    }
+
+    // Then load conversations
+    await _loadConversations();
+  }
+
+  Future<void> _loadConversations() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final conversations = await _apiService.getConversations();
+      setState(() {
+        _conversations = conversations;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.logout, color: Color(0xFF2563EB), size: 24),
+              SizedBox(width: 12),
+              Text(
+                'Logout',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF222222),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Are you sure you want to logout? You will need to sign in again to access your account.',
+            style: TextStyle(fontSize: 16, color: Color(0xFF6B7280)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _performLogout();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                'Logout',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _performLogout() async {
+    try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Clear auth token from API service
+      _apiService.clearAuthToken();
+
+      // Sign out using user service
+      final success = await _userService.signOut();
+
+      if (success) {
+        // Clear local state
+        setState(() {
+          _conversations.clear();
+          _currentUserId = null;
+          _isLoading = false;
+        });
+
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Successfully logged out'),
+              backgroundColor: Color(0xFF22C55E),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+
+        // Navigate to login page or handle logout success
+        // You might want to navigate to your login page here
+        // Navigator.of(context).pushReplacementNamed('/login');
+      } else {
+        throw Exception('Failed to logout');
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Logout failed: ${e.toString()}'),
+            backgroundColor: const Color(0xFFEF4444),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -77,16 +248,53 @@ class _HomePageState extends State<HomePage>
               ),
             ],
           ),
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: Color(0xFFE5E7EB), width: 2),
+          PopupMenuButton<String>(
+            offset: const Offset(0, 40),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: ClipOval(
-              child: Image.asset('assets/user/userLogo.png', fit: BoxFit.cover),
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Color(0xFFE5E7EB), width: 2),
+              ),
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/user/userLogo.png',
+                  fit: BoxFit.cover,
+                ),
+              ),
             ),
+            itemBuilder: (context) => [
+              PopupMenuItem<String>(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.logout,
+                      size: 20,
+                      color: Color(0xFF6B7280),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Logout',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF222222),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            onSelected: (value) {
+              if (value == 'logout') {
+                _showLogoutDialog();
+              }
+            },
           ),
         ],
       ),
@@ -311,19 +519,112 @@ class _HomePageState extends State<HomePage>
   Widget _buildConversationHistoryTab() {
     return LayoutBuilder(
       builder: (context, constraints) {
-        return SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: IntrinsicHeight(
-              child: Column(
-                children: [
-                  _buildOfflineUserCard(
-                    name: 'Software Engineer',
-                    subtitle: 'Goof',
-                    lastActive: '1d ago',
+        if (_isLoading) {
+          return const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2563EB)),
+            ),
+          );
+        }
+
+        if (_error != null) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 48,
+                  color: Color(0xFF6B7280),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Error loading conversations',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF222222),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _error!,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF6B7280),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _initializeData,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (_conversations.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.chat_bubble_outline,
+                  size: 48,
+                  color: Color(0xFF6B7280),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'No conversations yet',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF222222),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Start chatting with other professionals\nto see your conversation history here.',
+                  style: TextStyle(fontSize: 14, color: Color(0xFF6B7280)),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: _loadConversations,
+          color: const Color(0xFF2563EB),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: _conversations.map((conversation) {
+                final currentUserId = _currentUserId ?? 'unknown';
+                final otherParticipant = conversation.getOtherParticipantInfo(
+                  currentUserId,
+                );
+                return _buildOfflineUserCard(
+                  name: otherParticipant['name'] ?? 'Unknown User',
+                  subtitle: otherParticipant['title'] ?? 'Professional',
+                  lastActive: conversation.getLastActiveText(),
+                  onTap: () {
+                    // Navigate to chat page with conversation
+                    // Navigator.push(context, MaterialPageRoute(
+                    //   builder: (context) => ChatPage(conversationId: conversation.id),
+                    // ));
+                  },
+                );
+              }).toList(),
             ),
           ),
         );
@@ -335,6 +636,7 @@ class _HomePageState extends State<HomePage>
     required String name,
     required String subtitle,
     required String lastActive,
+    VoidCallback? onTap,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -405,7 +707,7 @@ class _HomePageState extends State<HomePage>
             ),
           ],
         ),
-        onTap: () {},
+        onTap: onTap ?? () {},
       ),
     );
   }

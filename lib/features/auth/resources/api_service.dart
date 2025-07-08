@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:loopedin/common/models/user_model.dart';
+import 'package:loopedin/common/models/conversation_model.dart';
 
 // API response models
 class ApiUser {
@@ -103,6 +104,7 @@ class ApiService {
   static const String _signInEndpoint = '/auth/signin/';
   static const String _signUpEndpoint = '/auth/signup/';
   static const String _signOutEndpoint = '/auth/signout/';
+  static const String _conversationsEndpoint = '/chat/conversations';
 
   late final Dio _dio;
 
@@ -312,5 +314,284 @@ class ApiService {
   // Clear auth token
   void clearAuthToken() {
     _dio.options.headers.remove('Authorization');
+  }
+
+  // Get all conversations
+  Future<List<ConversationModel>> getConversations() async {
+    try {
+      final response = await _dio.get(_conversationsEndpoint);
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+
+        if (kDebugMode) {
+          print('API Response type: ${data.runtimeType}');
+          print('API Response data: $data');
+        }
+
+        List<dynamic> conversationsJson;
+
+        // Handle different response formats
+        if (data is List) {
+          // Direct list response
+          conversationsJson = data;
+          if (kDebugMode) {
+            print('Handling as direct list response');
+          }
+        } else if (data is Map<String, dynamic>) {
+          // Response wrapped in an object
+          if (data.containsKey('conversations')) {
+            conversationsJson = data['conversations'] ?? [];
+            if (kDebugMode) {
+              print('Handling as conversations key response');
+            }
+          } else if (data.containsKey('data')) {
+            conversationsJson = data['data'] ?? [];
+            if (kDebugMode) {
+              print('Handling as data key response');
+            }
+          } else if (data.containsKey('results')) {
+            conversationsJson = data['results'] ?? [];
+            if (kDebugMode) {
+              print('Handling as results key response');
+            }
+          } else {
+            // Single conversation object
+            conversationsJson = [data];
+            if (kDebugMode) {
+              print('Handling as single conversation object');
+            }
+          }
+        } else {
+          conversationsJson = [];
+          if (kDebugMode) {
+            print('Handling as empty response');
+          }
+        }
+
+        return conversationsJson
+            .map((json) => ConversationModel.fromJson(json))
+            .toList();
+      } else {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          message: 'Failed to fetch conversations',
+        );
+      }
+    } on DioException catch (e) {
+      if (kDebugMode) {
+        print('Get conversations API error: ${e.message}');
+        print('Response data: ${e.response?.data}');
+      }
+
+      // Handle specific error cases
+      if (e.response?.statusCode == 401) {
+        throw DioException(
+          requestOptions: e.requestOptions,
+          response: e.response,
+          message: 'Unauthorized. Please sign in again.',
+        );
+      } else if (e.response?.statusCode == 404) {
+        throw DioException(
+          requestOptions: e.requestOptions,
+          response: e.response,
+          message: 'No conversations found.',
+        );
+      } else if (e.type == DioExceptionType.connectionTimeout) {
+        throw DioException(
+          requestOptions: e.requestOptions,
+          response: e.response,
+          message: 'Connection timeout. Please check your internet connection.',
+        );
+      }
+
+      rethrow;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Get conversations error: $e');
+      }
+      rethrow;
+    }
+  }
+
+  // Get conversation by ID
+  Future<ConversationModel> getConversationById(String conversationId) async {
+    try {
+      final response = await _dio.get(
+        '$_conversationsEndpoint/$conversationId',
+      );
+
+      if (response.statusCode == 200) {
+        return ConversationModel.fromJson(response.data);
+      } else {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          message: 'Failed to fetch conversation',
+        );
+      }
+    } on DioException catch (e) {
+      if (kDebugMode) {
+        print('Get conversation API error: ${e.message}');
+        print('Response data: ${e.response?.data}');
+      }
+
+      // Handle specific error cases
+      if (e.response?.statusCode == 401) {
+        throw DioException(
+          requestOptions: e.requestOptions,
+          response: e.response,
+          message: 'Unauthorized. Please sign in again.',
+        );
+      } else if (e.response?.statusCode == 404) {
+        throw DioException(
+          requestOptions: e.requestOptions,
+          response: e.response,
+          message: 'Conversation not found.',
+        );
+      }
+
+      rethrow;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Get conversation error: $e');
+      }
+      rethrow;
+    }
+  }
+
+  // Create new conversation
+  Future<ConversationModel> createConversation({
+    required String participant2Id,
+  }) async {
+    try {
+      final response = await _dio.post(
+        _conversationsEndpoint,
+        data: {'participant2_id': participant2Id},
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return ConversationModel.fromJson(response.data);
+      } else {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          message: 'Failed to create conversation',
+        );
+      }
+    } on DioException catch (e) {
+      if (kDebugMode) {
+        print('Create conversation API error: ${e.message}');
+        print('Response data: ${e.response?.data}');
+      }
+
+      // Handle specific error cases
+      if (e.response?.statusCode == 401) {
+        throw DioException(
+          requestOptions: e.requestOptions,
+          response: e.response,
+          message: 'Unauthorized. Please sign in again.',
+        );
+      } else if (e.response?.statusCode == 422) {
+        final data = e.response?.data;
+        if (data is Map<String, dynamic>) {
+          final errors = data['errors'] ?? data['message'];
+          if (errors != null) {
+            throw DioException(
+              requestOptions: e.requestOptions,
+              response: e.response,
+              message: errors.toString(),
+            );
+          }
+        }
+        throw DioException(
+          requestOptions: e.requestOptions,
+          response: e.response,
+          message: 'Invalid input data. Please check your information.',
+        );
+      }
+
+      rethrow;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Create conversation error: $e');
+      }
+      rethrow;
+    }
+  }
+
+  // Update conversation status
+  Future<void> updateConversationStatus({
+    required String conversationId,
+    required String status,
+  }) async {
+    try {
+      await _dio.patch(
+        '$_conversationsEndpoint/$conversationId/status',
+        data: {'status': status},
+      );
+    } on DioException catch (e) {
+      if (kDebugMode) {
+        print('Update conversation status API error: ${e.message}');
+        print('Response data: ${e.response?.data}');
+      }
+
+      // Handle specific error cases
+      if (e.response?.statusCode == 401) {
+        throw DioException(
+          requestOptions: e.requestOptions,
+          response: e.response,
+          message: 'Unauthorized. Please sign in again.',
+        );
+      } else if (e.response?.statusCode == 404) {
+        throw DioException(
+          requestOptions: e.requestOptions,
+          response: e.response,
+          message: 'Conversation not found.',
+        );
+      }
+
+      rethrow;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Update conversation status error: $e');
+      }
+      rethrow;
+    }
+  }
+
+  // Delete conversation
+  Future<void> deleteConversation(String conversationId) async {
+    try {
+      await _dio.delete('$_conversationsEndpoint/$conversationId');
+    } on DioException catch (e) {
+      if (kDebugMode) {
+        print('Delete conversation API error: ${e.message}');
+        print('Response data: ${e.response?.data}');
+      }
+
+      // Handle specific error cases
+      if (e.response?.statusCode == 401) {
+        throw DioException(
+          requestOptions: e.requestOptions,
+          response: e.response,
+          message: 'Unauthorized. Please sign in again.',
+        );
+      } else if (e.response?.statusCode == 404) {
+        throw DioException(
+          requestOptions: e.requestOptions,
+          response: e.response,
+          message: 'Conversation not found.',
+        );
+      }
+
+      rethrow;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Delete conversation error: $e');
+      }
+      rethrow;
+    }
   }
 }
